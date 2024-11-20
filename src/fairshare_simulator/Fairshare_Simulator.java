@@ -71,7 +71,7 @@ public class Fairshare_Simulator {
 
         // Here we chose the simulation scenario !!! params: (workload_log, scenario, usage_measurement)
         // Check SimulationSetup.init() to see and change scenarios
-        SimulationSetup setup = new SimulationSetup("NGI_CZ.swf", 1, 1);
+        SimulationSetup setup = new SimulationSetup("NGI_CZ_demo.swf", 1, 1);
         
         // create the Workload Parser which will read the data and fill all data structures with proper values of fairhare metrics
         JobExecutionSimulator wp = new JobExecutionSimulator();
