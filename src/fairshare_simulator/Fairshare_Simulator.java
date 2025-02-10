@@ -34,7 +34,7 @@ public class Fairshare_Simulator {
     // default duration is 15 days = 15 * (3600 * 24) / tick
     public static int max_days;
     // how we measure utilization (default is CPU/GPU hours)
-    public static int usage_divider;
+    public static double usage_divider;
     // simple line selector
     public static String requested_string_in_job_line = "";
     public static List<String> selected_logins;
@@ -69,9 +69,9 @@ public class Fairshare_Simulator {
      */
     public static void main(String[] args) {
 
-        // Here we chose the simulation scenario !!! params: (workload_log, scenario, usage_measurement)
+        // Here we chose the simulation scenario !!! params: workload_log (default is "NGI_CZ_demo.swf"), scenario, usage_measurement, PBS/SWF input
         // Check SimulationSetup.init() to see and change scenarios
-        SimulationSetup setup = new SimulationSetup("NGI_CZ_demo.swf", 1, 1);
+        SimulationSetup setup = new SimulationSetup("OpenPBS.log", 6, 1, true);
         
         // create the Workload Parser which will read the data and fill all data structures with proper values of fairhare metrics
         JobExecutionSimulator wp = new JobExecutionSimulator();
@@ -100,8 +100,8 @@ public class Fairshare_Simulator {
                 TimeSeries series_u = dataset_usage.getSeries(u);
                 TimeSeries series_ff = dataset_ff.getSeries(u);
                 TimeSeries series_c_u = dataset_cumul_usage.getSeries(u);
-                long usage_HPC = Math.round(usage_per_tick.get(u).get(curr_tick) / usage_divider);
-                long cumul_usage_HPC = Math.round(cumul_usage_per_tick.get(u).get(curr_tick) / usage_divider);
+                double usage_HPC = usage_per_tick.get(u).get(curr_tick) / usage_divider;
+                double cumul_usage_HPC = cumul_usage_per_tick.get(u).get(curr_tick) / usage_divider;
                 double ffHPC = calculate_fairshare_factor(users.get(u), curr_tick);
 
                 Date date = new java.util.Date((first_day_epoch + (tick * curr_tick)) * 1000);
@@ -129,7 +129,11 @@ public class Fairshare_Simulator {
         TimeSeriesChart exampleu = new TimeSeriesChart(prefix + "Usage in time", "", dataset_usage, false, width, height);
 
         if (use_decay) {
-            TimeSeriesChart examplecu = new TimeSeriesChart(prefix + "Cumulative Usage", "Decay factor=" + decay_factor + ", period=" + (decay_period / tick) + " hours", dataset_cumul_usage, false, width, height);
+            String unit = "hours";
+            if(tick==60){
+                unit = "minutes";
+            }
+            TimeSeriesChart examplecu = new TimeSeriesChart(prefix + "Cumulative Usage", "Decay factor=" + decay_factor + ", period=" + (decay_period / tick) + " "+unit, dataset_cumul_usage, false, width, height);
         } else {
             TimeSeriesChart examplecu = new TimeSeriesChart(prefix + "Cumulative Usage", "No Decaying applied", dataset_cumul_usage, false, width, height);
         }
@@ -149,9 +153,10 @@ public class Fairshare_Simulator {
         if (use_decay) {
             if ((curr_tick * tick) % decay_period == 0) {
                 for (int u = 0; u < users.size(); u++) {
-                    System.out.println("Doing decay at: " + curr_tick+" tick(s) for user: "+users.get(u));
+                    
                     long prev_usage = cumul_usage_per_tick.get(u).get(curr_tick);
                     long usage_decay = Math.round(prev_usage * decay_factor);
+                    System.out.println("Doing decay at: " + curr_tick+" tick(s) for user: "+users.get(u)+" usage: "+prev_usage/usage_divider+" dec: "+usage_decay/usage_divider);
                     cumul_usage_per_tick.get(u).remove(curr_tick);
                     cumul_usage_per_tick.get(u).add(curr_tick, usage_decay);
                 }

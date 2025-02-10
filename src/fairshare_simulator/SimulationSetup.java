@@ -20,6 +20,7 @@ public class SimulationSetup {
     public static String data;
     public static int scenario;
     public static int usage_policy;
+    public static boolean use_PBS_trace;
     public static String sql_query
             = "SELECT a.acct_id_string, a.create_time, (a.start_time-a.create_time) as wait_time, (a.end_time-a.start_time) as runtime, a.req_ncpus, a.req_mem, a.acct_user_id, u.user_name, a.queue, a.req_walltime, a.soft_walltime, s.gpu, array_agg(h.hostname) as node\n"
             + "      from acct_pbs_record a, acct_hosts_used s, acct_user u, acct_host h\n"
@@ -42,7 +43,7 @@ public class SimulationSetup {
      * @param usage_policy usage measurement policy (CPU time, CPU+RAM,
      * CPU+RAM+GPU)
      */
-    public SimulationSetup(String data_set, int scenario, int usage_policy) {
+    public SimulationSetup(String data_set, int scenario, int usage_policy, boolean pbs) {
         SimulationSetup.scenario = scenario;
         System.out.println("=================================================================");
         System.out.println("!!! OPEN SimulationSetup.java TO CHANGE SIMULATION PARAMETERS !!!");
@@ -51,7 +52,7 @@ public class SimulationSetup {
         System.out.println("        decay/SPEC weighting enabling/disabling etc. ");
         System.out.println("=================================================================");
 
-        init(data_set, scenario, usage_policy);
+        init(data_set, scenario, usage_policy, pbs);
     }
 
      /** This method chooses proper parameters for several different scenarios (and allow to add new ones).
@@ -60,17 +61,19 @@ public class SimulationSetup {
       * @param scenario scenario to simulate (e.g., metrics, SPEC weighting, decay)
       * @param usage_policy which metric to use for measuring resource usage (e.g., CPU, CPU+RAM, CPU+RAM+GPU (via Proc. Equivalent)) 
       */
-    public static void init(String data_set, int scenario, int usage_policy) {
+    public static void init(String data_set, int scenario, int usage_policy, boolean pbs) {
         SimulationSetup.data = data_set;
+        
+        use_PBS_trace = pbs;
 
         // how long is one tick of simulation (default is 1 hour, i.e., 3600)
-        Fairshare_Simulator.tick = 3600;
+        Fairshare_Simulator.tick = 60;
 
         // default duration is 15 days = 15 * (3600 * 24) / tick
         Fairshare_Simulator.max_days = 15 * (3600 * 24) / Fairshare_Simulator.tick;
 
         // how we measure utilization (default is CPU/GPU hours)
-        Fairshare_Simulator.usage_divider = Fairshare_Simulator.tick;
+        Fairshare_Simulator.usage_divider = Fairshare_Simulator.tick*60;
         // usage_policy (how we measure resource usage): 1 = cpu, 2 = cpu+ram, 3 = cpu+ram+gpu
         SimulationSetup.usage_policy = usage_policy;
 
@@ -116,6 +119,15 @@ public class SimulationSetup {
                 Fairshare_Simulator.use_SPEC = false;
                 Fairshare_Simulator.use_decay = false;
                 break;
+            case 6:
+                // All jobs of All users with decay (PBS sim)
+                Fairshare_Simulator.use_selected_user_logins_only = false;
+                Fairshare_Simulator.duplicate_users_for_shares = false;
+                Fairshare_Simulator.use_SPEC = false;
+                Fairshare_Simulator.use_decay = true;
+                Fairshare_Simulator.decay_period = 3 * 3600;
+                Fairshare_Simulator.decay_factor = 0.75;
+                break;    
 
             default:
 

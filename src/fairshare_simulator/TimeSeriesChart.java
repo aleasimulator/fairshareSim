@@ -49,6 +49,7 @@ public class TimeSeriesChart extends JFrame {
                 "Number", // Y-Axis Label  
                 dataset);
 
+        
         //Changes background color
         if (!subtitle.isEmpty()) {
             chart.addSubtitle(new TextTitle(subtitle+" ["+SimulationSetup.data+"]"));

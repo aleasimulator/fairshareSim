@@ -10,9 +10,11 @@ import workload_readers.WorkloadReader;
 import workload_readers.WorkloadReaderFromDB;
 import java.util.ArrayList;
 import usage_calculators.UsageCalculator;
+import workload_readers.WorkloadReaderPBS;
 
 /**
  * This class parses the workload file and simulates the execution of jobs.
+ *
  * @author Dalibor Klusacek
  */
 public class JobExecutionSimulator {
@@ -26,18 +28,22 @@ public class JobExecutionSimulator {
     public int curr_tick = 0;
 
     /**
-     * Calling this contructor will start the simulation of job executions by calling the method simulateJobArrivals().
+     * Calling this contructor will start the simulation of job executions by
+     * calling the method simulateJobArrivals().
      */
     public JobExecutionSimulator() {
         simulateJobArrivals();
     }
 
     /**
-     * This method simulate the execution of jobs, one simulation tick at a time. It is the main method of the whole simulator.<p>
-     * After selecting the proper Workload Reader (DB/file), it reads all jobs arriving at each simulation tick. 
-     * It then updates all internal data structures. Especially, it identifies new jobs, active jobs, running jobs and completed jobs (in each tick). 
-     * All internal data structures are updated by calling respective methods.
-     * Once completed, charts in the main class can be drawn using the generated data structures.
+     * This method simulate the execution of jobs, one simulation tick at a
+     * time. It is the main method of the whole simulator.<p>
+     * After selecting the proper Workload Reader (DB/file), it reads all jobs
+     * arriving at each simulation tick. It then updates all internal data
+     * structures. Especially, it identifies new jobs, active jobs, running jobs
+     * and completed jobs (in each tick). All internal data structures are
+     * updated by calling respective methods. Once completed, charts in the main
+     * class can be drawn using the generated data structures.
      */
     public void simulateJobArrivals() {
         boolean run_tick = true;
@@ -49,6 +55,8 @@ public class JobExecutionSimulator {
         WorkloadReader wr = null;
         if (Fairshare_Simulator.useSQL) {
             wr = new WorkloadReaderFromDB(data);
+        } else if (SimulationSetup.use_PBS_trace) {
+            wr = new WorkloadReaderPBS(data);
         } else {
             wr = new WorkloadReaderSWF(data);
         }
@@ -77,10 +85,10 @@ public class JobExecutionSimulator {
                 first_job = init_jobs.remove(0);
                 tot_jobs++;
                 //tick_start_epoch = first_job.getArrival() - (first_job.getArrival() % 86400);                
-                tick_start_epoch = Fairshare_Simulator.first_day_epoch;                
+                tick_start_epoch = Fairshare_Simulator.first_day_epoch;
                 tick_end_epoch = tick_start_epoch + tick;
                 active_jobs.add(first_job);
-                System.out.println("job: "+ first_job.getId() + " arrived as first at: " + first_job.getArrival());
+                System.out.println("job: " + first_job.getId() + " arrived as first at: " + first_job.getArrival());
             }
 
             //System.out.println("Read new jobs, pending: "+pending_job);
@@ -101,12 +109,12 @@ public class JobExecutionSimulator {
 
             // select jobs that run in this tick
             running_jobs = selectRunningJobs(tick_start_epoch, tick_end_epoch);
-
+                                  
             // update user-structures in the main class
             updateRunningJobsStatistics(tick_start_epoch, tick_end_epoch);
 
-            //apply decay if enabled
-            Fairshare_Simulator.applyDecay(curr_tick);
+//apply decay if enabled
+            Fairshare_Simulator.applyDecay(curr_tick);            
 
             //compute_queue_arrivals(tick_start_epoch, tick_end_epoch, new_jobs, curr_tick);
             //compute_user_arrivals(tick_start_epoch, tick_end_epoch, new_jobs, curr_tick);
@@ -114,7 +122,7 @@ public class JobExecutionSimulator {
             //compute_user_data(tick_start_epoch, tick_end_epoch, new_jobs, curr_tick);
             //aktualizace seznamu uloh - vyhod vsechny uz skoncene
             String dated = new java.text.SimpleDateFormat("HH:mm dd-MM-yyyy").format(new java.util.Date(tick_start_epoch * 1000));
-            System.out.println("Tick " + curr_tick + " so far jobs " + tot_jobs + " active = " + active_jobs.size() + " day = [" + dated+"]");
+            System.out.println("Tick " + curr_tick + " so far jobs " + tot_jobs + " active = " + active_jobs.size() + " day = [" + dated + "]");
 
             //vypocet a zapis vysledku
             //compute_results(tick_start_epoch, tick_end_epoch, curr_tick);
@@ -154,7 +162,9 @@ public class JobExecutionSimulator {
     }
 
     /**
-     * This method selects only those jobs that were running during this simulation tick.
+     * This method selects only those jobs that were running during this
+     * simulation tick.
+     *
      * @param start tick start time
      * @param end tick end time
      * @return jobs that are running during this tick
@@ -174,8 +184,10 @@ public class JobExecutionSimulator {
     }
 
     /**
-     * This method calculates resource usage of running jobs during this tick and then updates corresponding users records.
-     * It uses one of the supported usage-measuring metrics based on Processor Equivalent (PE).
+     * This method calculates resource usage of running jobs during this tick
+     * and then updates corresponding users records. It uses one of the
+     * supported usage-measuring metrics based on Processor Equivalent (PE).
+     *
      * @param start tick start time
      * @param end tick end time
      */
@@ -195,6 +207,7 @@ public class JobExecutionSimulator {
             int user_index = Fairshare_Simulator.users.indexOf(user);
             // fill in all structures up till this current tick
             Fairshare_Simulator.adjustUserRecords(user_index, curr_tick);
+            
             // update this user's tick's record with the running job
             long jend = Math.min(end, job.getEnd());
             long jstart = Math.max(start, job.getStart());
@@ -221,7 +234,8 @@ public class JobExecutionSimulator {
                     usage = 1;
             }
 
-            long cpu_seconds_per_tick = dur_per_tick * usage;
+            // 0.946 factor to reflect nonprecision accounting of OpenPBS
+            long cpu_seconds_per_tick = Math.round(dur_per_tick * usage * 0.946);
             if (Fairshare_Simulator.use_SPEC) {
                 cpu_seconds_per_tick = Math.round(cpu_seconds_per_tick * job.getSPEC());
             }
@@ -238,6 +252,7 @@ public class JobExecutionSimulator {
 
     /**
      * This method removes jobs that have finished in this simulation tick.
+     *
      * @param start tick start time
      * @param end tick end time
      */
@@ -245,12 +260,12 @@ public class JobExecutionSimulator {
         String output = "";
         for (int i = 0; i < active_jobs.size(); i++) {
             Job job = active_jobs.get(i);
-            if (job.getEnd() < start) {
+            if (job.getEnd() <= start) {
                 active_jobs.remove(job);
 
                 i--;
             }
         }
-       
+
     }
 }
